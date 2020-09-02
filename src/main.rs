@@ -8,6 +8,7 @@ use reqwest::blocking::Client;
 use std::{str, thread};
 use std::time::Duration;
 use structopt::StructOpt;
+use chrono::Local;
 
 /// Watches a subreddit for keywords. Requires the following environment variables:
 /// MAILGUN_DOMAIN, MAILGUN_API_KEY
@@ -73,9 +74,12 @@ fn main() -> reqwest::Result<()> {
             })
             .collect();
 
+        let time = Local::now().format("%F %T");
         if !posts.is_empty() {
-            println!("Notify re: {:?}", keywords);
+            println!("{}: Notify re: {:?}", time, keywords);
             notify(&mailgun, &emails, &keywords, &posts)?;
+        } else {
+            println!("{}: No notifications at this time.", time);
         }
 
         last_set = response.ids.into_iter().collect();
