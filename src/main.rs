@@ -74,6 +74,7 @@ fn main() -> reqwest::Result<()> {
             .collect();
 
         if !posts.is_empty() {
+            println!("Notify re: {:?}", keywords);
             notify(&mailgun, &emails, &keywords, &posts)?;
         }
 
