@@ -5,10 +5,12 @@ use hashbrown::HashSet;
 use mailgun::MailgunSender;
 use reddit::{Post, Response};
 use reqwest::blocking::Client;
-use std::{borrow::Borrow, time::Duration};
 use std::{str, thread};
+use std::time::Duration;
 use structopt::StructOpt;
 
+/// Watches a subreddit for keywords. Requires the following environment variables:
+/// MAILGUN_DOMAIN, MAILGUN_API_KEY
 #[derive(Clone, Debug, StructOpt)]
 struct Opt {
     /// Subreddits to be watched
@@ -55,14 +57,14 @@ fn main() -> reqwest::Result<()> {
 
     loop {
         let response: Response = client.get(&url).send()?.json()?;
-        let mut keywords = Vec::new();
+        let mut keywords = HashSet::new();
         let posts: Vec<_> = response
             .posts()
             .filter(|&post| !last_set.contains(&post.id))
             .filter(|&post| {
                 post.keywords().any(|x| {
                     if let Some(&keyword) = whitelist.get(&*x) {
-                        keywords.push(keyword);
+                        keywords.insert(keyword);
                         true
                     } else {
                         false
@@ -71,34 +73,45 @@ fn main() -> reqwest::Result<()> {
             })
             .collect();
 
-        notify(&mailgun, &emails, &keywords, posts)?;
+        if !posts.is_empty() {
+            notify(&mailgun, &emails, &keywords, &posts)?;
+        }
 
         last_set = response.ids.into_iter().collect();
         thread::sleep(WAIT_DURATION);
     }
 }
 
-fn notify<T: Borrow<Post>>(
+fn notify<'a>(
     mailgun: &MailgunSender,
     emails: &str,
-    keywords: &[&str],
-    posts: impl IntoIterator<Item = T>,
+    keywords: &HashSet<&'a str>,
+    posts: &'a [&'a Post],
 ) -> reqwest::Result<()> {
-    fn build_subject(keywords: &[&str]) -> String {
-        keywords.join(", ")
+    fn build_subject<'a>(keywords: &HashSet<&'a str>) -> String {
+        assert!(keywords.len() > 0);
+
+        let mut keywords = keywords.iter();
+        let mut buf = String::from(*keywords.next().unwrap());
+        keywords.for_each(|&keyword| {
+            buf += ", ";
+            buf += keyword;
+        });
+        buf
     }
 
-    fn build_text<T: Borrow<Post>>(posts: impl IntoIterator<Item = T>) -> String {
-        use std::fmt::Write;
+    fn build_text<'a>(posts: &'a [&'a Post]) -> String {
+        assert!(posts.len() > 0);
 
-        let mut links = String::new();
-        for post in posts {
-            write!(links, "{}\n", post.borrow().permalink).unwrap();
-        }
-        links
+        let mut buf = String::new();
+        posts.into_iter().for_each(|&post| {
+            buf.push_str(&post.permalink);
+            buf.push_str("\n");
+        });
+        buf
     }
 
-    let subject = build_subject(keywords);
+    let subject = build_subject(&keywords);
     let text = build_text(posts);
 
     mailgun.send(emails, &subject, &text)?;
