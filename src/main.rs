@@ -76,7 +76,7 @@ fn main() -> reqwest::Result<()> {
 
         let time = Local::now().format("%F %T");
         if !posts.is_empty() {
-            println!("{}: Notify re: {:?}", time, keywords);
+            println!("{}: {:?}", time, keywords);
             notify(&mailgun, &emails, &keywords, &posts)?;
         } else {
             println!("{}: No notifications at this time.", time);
