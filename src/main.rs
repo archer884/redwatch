@@ -1,14 +1,14 @@
 mod mailgun;
 mod reddit;
 
+use chrono::Local;
 use hashbrown::HashSet;
 use mailgun::MailgunSender;
 use reddit::{Post, Response};
 use reqwest::blocking::Client;
-use std::{str, thread};
 use std::time::Duration;
+use std::{str, thread};
 use structopt::StructOpt;
-use chrono::Local;
 
 /// Watches a subreddit for keywords. Requires the following environment variables:
 /// MAILGUN_DOMAIN, MAILGUN_API_KEY
@@ -87,13 +87,13 @@ fn main() -> reqwest::Result<()> {
     }
 }
 
-fn notify<'a>(
+fn notify(
     mailgun: &MailgunSender,
     emails: &str,
-    keywords: &HashSet<&'a str>,
-    posts: &'a [&'a Post],
+    keywords: &HashSet<&str>,
+    posts: &[&Post],
 ) -> reqwest::Result<()> {
-    fn build_subject<'a>(keywords: &HashSet<&'a str>) -> String {
+    fn build_subject(keywords: &HashSet<&str>) -> String {
         assert!(keywords.len() > 0);
 
         let mut keywords = keywords.iter();
@@ -105,7 +105,7 @@ fn notify<'a>(
         buf
     }
 
-    fn build_text<'a>(posts: &'a [&'a Post]) -> String {
+    fn build_text(posts: &[&Post]) -> String {
         assert!(posts.len() > 0);
 
         let mut buf = String::new();
